@@ -1,3 +1,55 @@
 ---
-- name: test patch
-- test
+ - name: Monthly patching for Allianz Linux servers to test it with 
+   #strategy: free 
+   hosts: all
+   gather_facts: true
+   become: yes
+   vars:
+     packages:
+      - sysfsutils
+      - lvm2
+   tasks:
+      - name: executing server configuration backup
+        script: /home/custid/patching/dev/config_bkp.sh      
+      - name: transfering the configuration data
+        fetch: src=/tmp/config-bkp.txt  dest=/home/custid/patching/output/{{ inventory_hostname }}-config-bkp.txt flat=yes
+      - name: executing  pre-patching script
+        script: /home/custid/patching/dev/checkin_fixlet_v1.sh
+      - name: installing dependency package if applicable
+        yum:
+          name: "{{ packages }}"
+           
+          state: present       
+      - name: applying operating system patches
+        yum:
+         name: '*'
+         state: latest
+        register: patch_update
+      - debug: var=patch_update
+      - name: Reboot immediately if patches applied.
+        shell: sleep 5 && reboot
+        async: 1
+        poll: 0
+        register: patch_reboot
+        when: patch_update.changed 
+      - debug: var=patch_reboot
+      - name: Wait for the reboot to complete if patches applied.
+        wait_for_connection:
+          connect_timeout: 5
+          sleep: 1
+          delay: 120
+          timeout: 600
+        register: time_out
+      - debug: var=time_out
+      - name: output of uptime
+        command: uptime 
+      - name: executing the post patching script. 
+        script: /home/custid/patching/dev/checkout_fixlet_v1.sh
+        ignore_errors: yes
+      - name: collecting health check status 
+        fetch: src=/tmp/PREPOST_REPORT/tmp_compare_report.txt dest=/home/custid/patching/result/{{ inventory_hostname }}-output.txt flat=yes
+        ignore_errors: yes
+      - name: output of uptime
+        command: uptime
+
+
