@@ -1,5 +1,5 @@
 ---
-###Added comments tot the playbook
+
  - name: Monthly patching for Allianz Linux servers to test it with 
    #strategy: free 
    hosts: all
